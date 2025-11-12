@@ -116,4 +116,9 @@ tasks {
         // https://plugins.jetbrains.com/docs/intellij/deployment.html#specifying-a-release-channel
         channels = properties("pluginVersion").map { listOf(it.substringAfter('-', "").substringBefore('.').ifEmpty { "default" }) }
     }
+
+    // Disable building searchable options to avoid failures on newer platform builds
+    buildSearchableOptions {
+        enabled = false
+    }
 }

@@ -7,7 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindowManager
 import org.jetbrains.plugins.terminal.ShellTerminalWidget
 import org.jetbrains.plugins.terminal.TerminalToolWindowFactory
-import org.jetbrains.plugins.terminal.TerminalView
+import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 import java.io.IOException
 
 abstract class BaseGenerationAnAction : BaseAnAction() {
@@ -33,7 +33,6 @@ abstract class BaseGenerationAnAction : BaseAnAction() {
 
     fun execCommand(project: Project, projectPath: String, command: String) {
         // Check terminal exists
-        val terminalView = TerminalView.getInstance(project)
         val window = ToolWindowManager.getInstance(project).getToolWindow(TerminalToolWindowFactory.TOOL_WINDOW_ID)
         if (window == null) {
             showErrorMessage("Please check that the following plugins are installed: Terminal")
@@ -44,15 +43,26 @@ abstract class BaseGenerationAnAction : BaseAnAction() {
         val terminalName = "Flutter-Toolkit"
         val content = window.contentManager.findContent(terminalName)
         if (content != null) {
-            terminalView.closeTab(content)
+            // Close existing tab with same name using ContentManager API
+            window.contentManager.removeContent(content, true)
         }
 
-        // Start new terminal
-        try {
-            val terminalWidget: ShellTerminalWidget = terminalView.createLocalShellWidget(projectPath, terminalName)
-            terminalWidget.executeCommand(command)
-        } catch (exception: IOException) {
-            showErrorMessage("Cannot run command:" + command + "  " + exception.message)
-        }
+        // Start new terminal using TerminalToolWindowManager (preferred API)
+        // Ensure tool window is activated so the component is showing for the reworked engine
+        window.activate({
+            try {
+                val terminalWidget = TerminalToolWindowManager.getInstance(project)
+                    .createShellWidget(projectPath, terminalName, false, false)
+                terminalWidget.sendCommandToExecute(command)
+            } catch (exception: IOException) {
+                showErrorMessage("Cannot run command:" + command + "  " + exception.message)
+            } catch (exception: NullPointerException) {
+                // Avoid hard crash on non-JediTerm engines
+                showErrorMessage("Terminal execution failed. Please disable 'New Terminal' in IDE settings or update the IDE.")
+            } catch (exception: IllegalStateException) {
+                // Handle the reworked terminal engine component visibility timing
+                showErrorMessage("Terminal UI not ready. Please retry or switch to Classic engine.")
+            }
+        }, true)
     }
 }
