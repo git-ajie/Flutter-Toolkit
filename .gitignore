@@ -2,3 +2,7 @@
 .idea
 .qodana
 build
+.kotlin/
+
+.claude/
+CLAUDE.md
